@@ -1432,6 +1432,61 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                 }
                 break;
 
+                case OP_SHA256_INIT: // (in -- sha256_ctx)
+                {
+                    if (stack.size() < 1)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    CSHA256 ctx;
+                    valtype& vch = stacktop(-1);
+
+                    ctx.Write(vch.data(), vch.size());
+
+                    popstack(stack);
+                    stack.push_back(ctx.Save());
+                }
+                break;
+
+                case OP_SHA256_WRITE: // (sha256_ctx in -- sha256_ctx)
+                {
+                    if (stack.size() < 2)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    CSHA256 ctx;
+                    valtype& vchCtx = stacktop(-2);
+                    if (!ctx.Load(vchCtx))
+                        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+
+                    valtype& vch = stacktop(-1);
+                    ctx.Write(vch.data(), vch.size());
+
+                    popstack(stack);
+                    popstack(stack);
+                    stack.push_back(ctx.Save());
+                }
+                break;
+
+                case OP_SHA256_FINALIZE:
+                {
+                    // (sha256_ctx in -- hash)
+                    if (stack.size() < 2)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    valtype& vchCtx = stacktop(-2);
+                    CSHA256 ctx;
+                    if (!ctx.Load(vchCtx))
+                        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+
+                    valtype& vch = stacktop(-1);
+                    valtype vchHash(32);
+                    ctx.Write(vch.data(), vch.size()).Finalize(vchHash.data());
+
+                    popstack(stack);
+                    popstack(stack);
+                    stack.push_back(vchHash);
+                }
+                break;
+
                 default:
                     return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
             }
